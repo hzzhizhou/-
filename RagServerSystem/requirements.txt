@@ -1,0 +1,48 @@
+# 依赖清单（版本锁定为 .venv 实测可用组合：langchain 生态破坏性更新频繁，勿裸升）
+# 原清单一处实际缺依赖：pymysql/aiomysql/prometheus_client 此前装了却没写进来，
+# 全新环境 pip install -r requirements.txt 会因缺驱动直接启动失败，已补上。
+
+# LLM & LangChain
+langchain==1.2.15
+langchain-core==1.3.0
+langchain-community==0.4.1
+langchain-openai==1.1.14
+langchain-chroma==1.1.0
+langchain-text-splitters==1.1.2
+
+# RAG：向量库与嵌入
+chromadb==1.5.8
+# 本地 bge 嵌入后端（EMBEDDING_BACKEND="local" 时才加载；默认 dashscope 云端可省）
+sentence-transformers==5.4.1
+pypdf==6.10.2
+python-docx==1.2.0
+openpyxl==3.1.5
+
+# 关键词检索与分词
+rank-bm25==0.2.2
+jieba==0.42.1
+
+# 工具
+python-dotenv==1.2.2
+pydantic==2.13.2
+redis==7.4.0
+pymysql==1.1.2          # 业务库（订单/工单/用户/会话/DST）同步驱动
+aiomysql==0.3.2         # 文档入库状态异步驱动
+httpx==0.28.1
+python-multipart==0.0.26
+watchfiles==1.1.1
+prometheus_client==0.25.0   # /metrics 指标暴露
+
+# Web / 应用
+fastapi==0.136.0
+uvicorn[standard]==0.44.0
+
+# 评估
+ragas==0.4.3
+datasets==4.8.4
+
+# 测试（开发环境）
+pytest==9.0.3
+pytest-asyncio==1.3.0
+pytest-cov==7.1.0
+pytest-mock==3.15.1

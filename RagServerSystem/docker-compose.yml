@@ -1,0 +1,85 @@
+# 一键编排：MySQL（必需，业务数据）+ Redis（热缓存）+ 后端 API
+#
+# 用法：
+#   1. 准备 .env：cp .env.example .env，填 DASHSCOPE_API_KEY；
+#      Redis_password 必须与 deploy/redis/conf/redis.conf 里的 requirepass 一致
+#   2. docker compose up -d --build
+#   3. 首次启动 app 容器检测到向量库为空会自动入库（DashScope embedding，约 1-2 分钟），
+#      docker compose logs -f app 看到 "Uvicorn running" 即就绪
+#
+# 宿主机映射：API 8000；MySQL 暴露到宿主机 3307（避开本机已有 3306）。
+# 应用访问 MySQL/Redis 始终走容器内网络（服务名），与宿主机映射无关。
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: rag-mysql
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-rag_db}
+      MYSQL_USER: ${MYSQL_USER:-rag_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-123456}
+    # utf8mb4：与本地部署要求一致（README 准备 MySQL 一节的建库语句）
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: rag-redis
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./deploy/redis/conf/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  app:
+    build: .
+    container_name: rag-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # environment 优先级高于 env_file：容器内把 MySQL/Redis 指向服务名（覆盖 .env 里的
+    # 127.0.0.1）；其余变量（DASHSCOPE_API_KEY / Redis_password / MYSQL 口令）由 .env 注入
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    env_file:
+      - .env
+    volumes:
+      # 知识库语料：更新文件后重建索引：
+      #   docker compose run --rm app python -m ingestion.service
+      - ./data:/app/data
+      # Chroma 数据：named volume，容器重建不丢（首次由入口脚本自动入库）
+      - vector-data:/app/vector_db-sql
+      - app-logs:/app/logs
+    ports:
+      - "8000:8000"
+
+volumes:
+  mysql-data:
+  redis-data:
+  vector-data:
+  app-logs:

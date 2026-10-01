@@ -1,0 +1,57 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+ENV/
+.pytest_cache/
+
+# ===== Node / 前端 =====
+node_modules/
+dist/
+dist-ssr/
+coverage/
+*.local
+*.tsbuildinfo
+.eslintcache
+
+# ===== 密钥 =====
+# 只忽略 .env 本身；.env.example 是模板，必须入库
+.env
+
+# ===== 生成物：向量库 / 分块缓存 =====
+vector_db/
+vector_db-sql/
+*.vector_db-*
+parent_cache.json
+
+# ===== 生成物：日志 / 运行时数据库 =====
+# 注意：logs/log_config.py 是源码，不能整目录忽略，只忽略日志目录
+Log_server/
+*.log
+*.db
+*.sqlite3
+
+# ===== 生成物：其他 =====
+plantuml.jar
+# 带 "/" 的写法会锚定到本文件所在目录，跨子目录必须加 **/
+**/redis/data/
+
+# ===== 外部依赖：本地模型（约 656 MB，需自行下载）=====
+models/
+
+# ===== AI 工具目录 =====
+.trae/
+
+# ===== IDE / 编辑器 =====
+# 用 **/.vscode/* 而非 **/.vscode/：目录被整体排除后无法再放行其中的文件
+**/.vscode/*
+!**/.vscode/extensions.json
+.idea/
+*.sw?
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
+*.tmp

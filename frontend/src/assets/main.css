@@ -1,0 +1,15 @@
+@import './base.css';
+
+/* 全屏布局，避免 create-vue 模板的居中/网格样式干扰 Element Plus */
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  overflow: hidden;
+}

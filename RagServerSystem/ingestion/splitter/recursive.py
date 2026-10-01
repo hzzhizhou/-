@@ -1,0 +1,63 @@
+"""递归字符分块（原 DocumentSplitter 逻辑）"""
+from typing import List
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from config.settings import CHUNK_SIZE, CHUNK_OVERLAP
+from logs.log_config import data_layer_log as log
+from .base import (
+    split_by_markdown_headers, add_chunk_metadata,
+    is_table_doc, is_markdown_table_row, split_table_segments, markdown_table_chunks
+)
+
+
+class RecursiveChunker():
+    """
+    递归字符分块器（默认策略）
+    先对 Markdown 文件按标题切分，再对超长块递归切分
+    """
+
+    def __init__(self, chunk_size: int = CHUNK_SIZE, chunk_overlap: int = CHUNK_OVERLAP):
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            separators=["\n\n", "\n", "。", "！", "？", "；", " ", ""]
+        )
+
+    def split_documents(self, docs: List[Document]) -> List[Document]:
+        # 1. 对 Markdown 文件进行结构切分
+        structure_chunks = split_by_markdown_headers(docs)
+
+        # 2. 递归控制长度
+        final_chunks = []
+        for chunk in structure_chunks:
+            # 表格解析器产出的块已按「表头 + 整行」分组，长度受控，不再二次切分
+            if is_table_doc(chunk) or len(chunk.page_content) <= self.chunk_size:
+                final_chunks.append(chunk)
+            elif any(is_markdown_table_row(line) for line in chunk.page_content.split("\n")):
+                # 含表格的超长块：表格段单独走「表头 + 整行」分组，避免被 sep 切散
+                final_chunks.extend(self._split_with_tables(chunk))
+            else:
+                sub_chunks = self.text_splitter.split_documents([chunk])
+                final_chunks.extend(sub_chunks)
+
+        # 3. 添加块级元数据
+        final_chunks = add_chunk_metadata(final_chunks, chunk_type="recursive")
+        log.info(f"递归分块完成，共 {len(final_chunks)} 块")
+        return final_chunks
+
+    def _split_with_tables(self, chunk: Document) -> List[Document]:
+        """普通文本段沿用递归切分，表格段按「表头 + 整行」分组（不切开任何一行）"""
+        result = []
+        for is_table, segment in split_table_segments(chunk.page_content):
+            if not segment.strip():
+                continue
+            if is_table:
+                for table_text in markdown_table_chunks(segment, self.chunk_size):
+                    result.append(Document(page_content=table_text,
+                                           metadata=chunk.metadata.copy()))
+            else:
+                result.extend(self.text_splitter.split_documents(
+                    [Document(page_content=segment, metadata=chunk.metadata.copy())]))
+        return result
